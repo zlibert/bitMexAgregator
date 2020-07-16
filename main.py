@@ -1,3 +1,4 @@
+import sys
 import websocket
 import json
 import pandas as pd
@@ -24,29 +25,32 @@ class trade:
         self.foreignNotional = foreignNotional
 
     def __str__(self):
-        return (f"{self.timestamp},{self.side},{self.size},{self.price},{self.grossValue}, \
-                {self.homeNotional},{self.foreignNotional}")
+        return (f"{self.timestamp},{self.side},{self.size},{self.price},{self.grossValue},{self.homeNotional},{self.foreignNotional}")
 
 class candle:
-    def __init__(self, timestamp, o, h, l, c, v, interval):
+    def __init__(self, timestamp, o, h, l, c, v):
         self.timestamp = timestamp
         self.open = o
         self.high = h
         self.low = l
         self.close = c
         self.volume = v
-        self.interval = interval
 
     def __str__(self):
-        return (f"{self.timestamp},{self.open},{self.high},{self.low},{self.close},{self.volume},{self.interval}")
+        return (f"{self.timestamp},{self.open},{self.high},{self.low},{self.close},{self.volume}")
 
     def addVolume(self,v):
         self.volume += v
 
 def aggregate(trade):
     if trade.timestamp not in candlesticks:     #first candle of that timestamp interval
-        c = candle(trade.timestamp,trade.price, trade.price, trade.price, trade.price, trade.homeNotional, interval)
+        print("Timestamp,side,size,price,grossValue,homeNotional,foreignNotional   - Timestamp,Open,High,Low,Close,Vol (Present Candle)")
+        c = candle(trade.timestamp,trade.price, trade.price, trade.price, trade.price, trade.homeNotional)
         candlesticks[trade.timestamp] = c
+        if ("test" in sys.argv):                          #test mode - used for CI
+            if c.open > 0 and c.high > 0 and c.low > 0 and c.close > 0 and c.volume > 0 :
+                print("Test OK")
+                exit(0)
     else:
         if trade.price > candlesticks[trade.timestamp].high:
             candlesticks[trade.timestamp].high = trade.price
@@ -55,7 +59,7 @@ def aggregate(trade):
 
     candlesticks[trade.timestamp].close = trade.price
     candlesticks[trade.timestamp].addVolume(trade.homeNotional)
-    print("< ",candlesticks[trade.timestamp])
+    print( '< {:<65s} - {:<65s}'.format(str(trade), str(candlesticks[trade.timestamp]) ) )
 
 
 def addTrade(t):
@@ -95,7 +99,7 @@ def on_message(ws, message):
 
     elif ("success" in tmp):
         print(f"- Suscribed successfully to {symbol}> Sending:  {tmp})")
-        print("- Receiving:")
+        print(f"- Receiving and aggregating for interval {interval}:")
 
 
 def on_error(ws, error):
@@ -121,6 +125,6 @@ if __name__ == "__main__":
                               on_close = on_close)
     ws.on_open = on_open
     ws.run_forever()
-
+    print(f"\nCandlesticks:\n    Timestamp   , Open, High, Low, Close, Volume")
     for key, value in candlesticks.items():
         print(value)    #this constitutes a candlestick or line
